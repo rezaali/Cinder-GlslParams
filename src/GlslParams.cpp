@@ -3,7 +3,6 @@
 
 using namespace reza::glsl;
 using namespace cinder;
-using namespace glm;
 using namespace std;
 
 GlslParams::GlslParams() { }
