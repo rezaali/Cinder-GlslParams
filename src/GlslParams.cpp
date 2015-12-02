@@ -102,10 +102,23 @@ void GlslParams::parse( const string& source ) {
         { "bool" , "button" },
         { "bool" , "toggle" }
     };
-    
+    bool ignore = false;
     vector<string> lines = split( source, '\n' );
     for( auto& it : lines ) {
         string line = it;
+        
+        string ignoreStart( "/*" );
+        string ignoreEnd( "*/" );
+        if( !ignore && line.find( ignoreStart ) != string::npos ) {
+            ignore = true;
+        }
+        
+        if( ignore && line.find( ignoreEnd ) == string::npos ) {
+            continue;
+        } else {
+            ignore = false;
+        }
+        
         std::transform( line.begin(), line.end(), line.begin(), ::tolower );
         string uniform( "uniform " );
         string semicolon( ";" );
