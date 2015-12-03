@@ -105,6 +105,7 @@ void GlslParams::parse( const string& source ) {
     bool ignore = false;
     vector<string> lines = split( source, '\n' );
     for( auto& it : lines ) {
+        string original = it;
         string line = it;
         
         string ignoreStart( "/*" );
@@ -152,7 +153,7 @@ void GlslParams::parse( const string& source ) {
         
         if( !valid ) { continue; }
         
-        string uniformName = line;
+        string uniformName = original;
         size_t foundSemicolon = uniformName.find( semicolon );
         uniformName = uniformName.substr( 0, foundSemicolon );
         uniformName = uniformName.replace( foundType, type.length(), "" );
