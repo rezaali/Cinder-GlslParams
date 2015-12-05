@@ -161,11 +161,6 @@ void GlslParams::parse( const string& source ) {
         uniformName = trim( uniformName, " " );
         
         string uiParams = line.substr( foundUIType + key.length() );
-        size_t lastspace = line.rfind( space );
-        if( lastspace != string::npos ) {
-            uiParams = uiParams.substr( 0, lastspace );
-        }
-        
         vector<string> params = split( uiParams, "," );
         if( params.size() == 0 ) { continue; }
         
@@ -181,7 +176,7 @@ void GlslParams::parse( const string& source ) {
             mFloatRanges[ uniformName ] = { stof( params[ 0 ] ), stof( params[ 1 ] ) };
         }
         else if( type == "vec2" ) {
-            if( uitype == "range" && params.size() > 3 ) {
+            if( uitype == "range" && params.size() > 2 ) {
                 mVec2Params[ uniformName ] = vec2( stof( params[ 2 ] ), stof( params[ 3 ] ) );
             }
             else{
