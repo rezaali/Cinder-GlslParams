@@ -94,10 +94,17 @@ void GlslParams::parse( const string& source ) {
         { "vec2" , "pad" },
         { "vec2" , "range" },
         { "vec2" , "ui" },
+        { "vec2" , "slider" },
+        { "vec2" , "dialer" },
         
         { "vec3" , "ui" },
+        { "vec3" , "slider" },
+        { "vec3" , "dialer" },
+        
         { "vec4" , "ui" },
+        { "vec4" , "slider" },
         { "vec4" , "color" },
+        { "vec4" , "dialer" },                
         
         { "bool" , "button" },
         { "bool" , "toggle" }
@@ -162,46 +169,73 @@ void GlslParams::parse( const string& source ) {
         
         string uiParams = line.substr( foundUIType + key.length() );
         vector<string> params = split( uiParams, "," );
-        if( params.size() == 0 ) { continue; }
+        int size = params.size();
+        if( size < 1 ) { continue; }
         
-        if( type == "bool" ) {
-            mBoolParams[ uniformName ] = stoi( params[ 0 ] ) > 0 ? true : false;
-        }
-        else if( type == "int" ) {
-            mIntParams[ uniformName ] = stoi( params[ 2 ] );
-            mIntRanges[ uniformName ] = { stoi( params[ 0 ] ), stoi( params[ 1 ] ) };
-        }
-        else if( type == "float" ) {
-            mFloatParams[ uniformName ] = stof( params[ 2 ] );
-            mFloatRanges[ uniformName ] = { stof( params[ 0 ] ), stof( params[ 1 ] ) };
-        }
-        else if( type == "vec2" ) {
-            if( uitype == "range" && params.size() > 2 ) {
-                mVec2Params[ uniformName ] = vec2( stof( params[ 2 ] ), stof( params[ 3 ] ) );
-            }
-            else{
-                mVec2Params[ uniformName ] = vec2( stof( params[ 2 ] ) );
-            }
-            mVec2Ranges[ uniformName ] = { stof( params[ 0 ] ), stof( params[ 1 ] ) };
-        }
-        else if( type == "vec3" ) {
-            mVec3Params[ uniformName ] = vec3( stof( params[ 2 ] ) );
-            mVec3Ranges[ uniformName ] = { stof( params[ 0 ] ), stof( params[ 1 ] ) };
-        }
-        else if( type == "vec4" ) {
-            if( uitype == "color" && params.size() > 3 ) {
-                ColorA clr;
-                clr.set( ColorModel::CM_RGB, vec4( stof( params[ 0 ] ), stof( params[ 1 ] ), stof( params[ 2 ] ), stof( params[ 3 ] ) ) );
-                mColorParams[ uniformName ] = clr;
-            }
-            else {
-                mVec4Params[ uniformName ] = vec4( stof( params[ 2 ] ) );
-                mVec4Ranges[ uniformName ] = { stof( params[ 0 ] ), stof( params[ 1 ] ) };
+        vector<float> values;
+        
+        bool invalidParams = false;
+        
+        for( auto &it : params ) {
+            try {
+                values.emplace_back( stof( it ) );
+            } catch( std::exception& exc ) {
+                invalidParams = true;
+                break;
             }
         }
 
-        mTypeMap.insert( { uniformName, { type, uitype } } ); 
-        mParamOrder[ mParamOrder.size() ] = uniformName;
+        if( invalidParams ) { continue; }
+        
+        valid = false;
+        
+        if( type == "bool" && size == 1 ) {
+            bool val = values[ 0 ] > 0.5 ? true : false;
+            mBoolParams[ uniformName ] = val;
+            valid = true;
+        }
+        else if( type == "int" && size > 2 ) {
+            mIntParams[ uniformName ] = values[ 2 ];
+            mIntRanges[ uniformName ] = { values[ 0 ], values[  1 ] };
+            valid = true;
+        }
+        else if( type == "float" && size > 2 ) {
+            mFloatParams[ uniformName ] = values[ 2 ];
+            mFloatRanges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            valid = true;
+        }
+        else if( type == "vec2" && size > 2 ) {
+            if( uitype == "range" && size > 3 ) {
+                mVec2Params[ uniformName ] = vec2( values[ 2 ], values[ 3 ] );
+            }
+            else{
+                mVec2Params[ uniformName ] = vec2( values[ 2 ] );
+            }
+            mVec2Ranges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            valid = true;
+        }
+        else if( type == "vec3" && size > 2 ) {
+            mVec3Params[ uniformName ] = vec3( values[ 2 ] );
+            mVec3Ranges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            valid = true;
+        }
+        else if( type == "vec4" && size > 2 ) {
+            if( uitype == "color" && size > 3 ) {
+                ColorA clr;
+                clr.set( ColorModel::CM_RGB, vec4( values[ 0 ], values[ 1 ], values[ 2 ], values[ 3 ] ) );
+                mColorParams[ uniformName ] = clr;
+            }
+            else {
+                mVec4Params[ uniformName ] = vec4( values[ 2 ] );
+                mVec4Ranges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            }
+            valid = true;
+        }
+        
+        if( valid ) {
+            mTypeMap.insert( { uniformName, { type, uitype } } );
+            mParamOrder[ mParamOrder.size() ] = uniformName;
+        }
     }
 }
 
