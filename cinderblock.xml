@@ -6,7 +6,7 @@
 	git="https://github.com/rezaali/Cinder-GlslParams.git"
 	url="https://github.com/rezaali/Cinder-GlslParams"
 	author="Reza Ali syed.reza.ali@gmail.com"
-	summary="GlslParams helps parse & apply glsl uniforms for UI creation from comments. i.e. uniform float foo; //UI:0.0,1.0,0.5"
+	summary="GlslParams helps parse and apply glsl uniforms for UI creation from comments. i.e. uniform float foo; //UI:0.0,1.0,0.5"
 	license="MIT"
 	>
 	<headerPattern>src/*.h</headerPattern>
