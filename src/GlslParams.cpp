@@ -3,7 +3,6 @@
 
 using namespace reza::glsl;
 using namespace cinder;
-using namespace glm;
 using namespace std;
 
 GlslParams::GlslParams() { }
@@ -13,31 +12,59 @@ GlslParams::GlslParams( const string& source ) {
 }
 
 GlslParams::~GlslParams() {
-    mParams.clear();
-    mRanges.clear();
+    clearUniforms();
 }
 
 GlslParams::GlslParams( const GlslParams &copy ) {
-    for( auto& it : copy.mParams ) { mParams[ it.first ] = it.second; }
-    for( auto& it : copy.mRanges ) { mRanges[ it.first ] = it.second; }
+    
+    for( auto& it : copy.mParamOrder ) { mParamOrder[ it.first ] = it.second; }
+    
+    for( auto& it : copy.mTypeMap ) { mTypeMap[ it.first ] = it.second; }
+    for( auto& it : copy.mBoolParams ) { mBoolParams[ it.first ] = it.second; }
+ 
+    for( auto& it : copy.mIntParams ) { mIntParams[ it.first ] = it.second; }
+    for( auto& it : copy.mIntRanges ) { mIntRanges[ it.first ] = it.second; }
+
+    for( auto& it : copy.mFloatParams ) { mFloatParams[ it.first ] = it.second; }
+    for( auto& it : copy.mFloatRanges ) { mFloatRanges[ it.first ] = it.second; }
+    
+    for( auto& it : copy.mVec2Params ) { mVec2Params[ it.first ] = it.second; }
+    for( auto& it : copy.mVec2Ranges ) { mVec2Ranges[ it.first ] = it.second; }
+
+    for( auto& it : copy.mVec3Params ) { mVec3Params[ it.first ] = it.second; }
+    for( auto& it : copy.mVec3Ranges ) { mVec3Ranges[ it.first ] = it.second; }
+
+    for( auto& it : copy.mVec4Params ) { mVec4Params[ it.first ] = it.second; }
+    for( auto& it : copy.mVec4Ranges ) { mVec4Ranges[ it.first ] = it.second; }
+    
+    for( auto& it : copy.mColorParams ) { mColorParams[ it.first ] = it.second; }
 }
 
 void GlslParams::clearUniforms() {
-    mParams.clear();
-    mRanges.clear();
+    mParamOrder.clear();
+    mTypeMap.clear();
+    mBoolParams.clear();
+    mIntParams.clear();     mIntRanges.clear();
+    mFloatParams.clear();   mFloatRanges.clear();
+    mVec2Params.clear();    mVec2Ranges.clear();
+    mVec3Params.clear();    mVec3Ranges.clear();
+    mVec4Params.clear();    mVec4Ranges.clear();
+    mColorParams.clear();
 }
 
 void GlslParams::applyUniforms( const ci::gl::GlslProgRef& glslRef ) {
-    for( auto& it : mParams ) {
-        glslRef->uniform( it.first, it.second );
-    }
+    for( auto& it : mBoolParams ) { glslRef->uniform( it.first, it.second ); }
+    for( auto& it : mIntParams ) { glslRef->uniform( it.first, it.second ); }
+    for( auto& it : mFloatParams ) { glslRef->uniform( it.first, it.second ); }
+    for( auto& it : mVec2Params ) { glslRef->uniform( it.first, it.second ); }
+    for( auto& it : mVec3Params ) { glslRef->uniform( it.first, it.second ); }
+    for( auto& it : mVec4Params ) { glslRef->uniform( it.first, it.second ); }
+    for( auto& it : mColorParams ) { glslRef->uniform( it.first, it.second ); }
 }
 
 void GlslParams::parseUniforms( const vector<string>& sources ) {
     clearUniforms();
-    for( auto& it : sources ) {
-        parse( it );
-    }
+    for( auto& it : sources ) { parse( it ); }
 }
 
 void GlslParams::parseUniforms( const string& source ) {
@@ -46,60 +73,191 @@ void GlslParams::parseUniforms( const string& source ) {
 }
 
 void GlslParams::parse( const string& source ) {
+    auto trim = [] ( const string& input, const string& key ) {
+        string temp = input;
+        size_t foundKey = temp.find( key );
+        while( foundKey != string::npos ) {
+            temp  = temp.replace( foundKey, key.length(), "" );
+            foundKey = temp.find( key );
+        }
+        return temp;
+    };
+    
+    multimap<string, string> uiTypeMap  = {
+        { "int" , "slider" },
+        { "int" , "dialer" },
+        
+        { "float" , "ui" },
+        { "float" , "slider" },
+        { "float" , "dialer" },
+        
+        { "vec2" , "pad" },
+        { "vec2" , "range" },
+        { "vec2" , "ui" },
+        { "vec2" , "slider" },
+        { "vec2" , "dialer" },
+        
+        { "vec3" , "ui" },
+        { "vec3" , "slider" },
+        { "vec3" , "dialer" },
+        
+        { "vec4" , "ui" },
+        { "vec4" , "slider" },
+        { "vec4" , "color" },
+        { "vec4" , "dialer" },                
+        
+        { "bool" , "button" },
+        { "bool" , "toggle" }
+    };
+    bool ignore = false;
     vector<string> lines = split( source, '\n' );
     for( auto& it : lines ) {
+        string original = it;
         string line = it;
         
-        string uniform ("uniform float ");
-        string semicolon (";");
-        string space (" ");
-        string key ("//UI:");
-        string comma (",");
-        string newLine ("/n");
+        string ignoreStart( "/*" );
+        string ignoreEnd( "*/" );
+        if( !ignore && line.find( ignoreStart ) != string::npos ) {
+            ignore = true;
+        }
         
-        size_t foundUniform = line.find( uniform );
-        size_t foundUI = line.find( key );
+        if( ignore && line.find( ignoreEnd ) == string::npos ) {
+            continue;
+        } else {
+            ignore = false;
+        }
         
-        if( foundUniform != string::npos && foundUI != string::npos ) {
-            string uiParams = line.substr( foundUI + key.length() );
-            
-            size_t foundMinimum = uiParams.find( comma );
-            string minimum = uiParams.substr( 0, foundMinimum );
-            uiParams = uiParams.substr( foundMinimum + 1 );
-            
-            size_t foundMaximum = uiParams.find( comma );
-            string maximum = uiParams.substr( 0, foundMaximum );
-            uiParams = uiParams.substr( foundMaximum + 1 );
-            
-            size_t foundValue = uiParams.find( newLine );
-            string value = uiParams.substr( 0, foundValue );
-            
-            float max = stof( maximum );
-            float min = stof( minimum );
-            float val = stof( value );
-            
-            string uniformName = line.substr( uniform.length() );
-            size_t foundSemicolon = uniformName.find( semicolon );
-            uniformName = uniformName.substr( 0, foundSemicolon );
-            size_t foundSpace = uniformName.find( space );
-            
-            while( foundSpace != string::npos ) {
-                uniformName = uniformName.replace( foundSpace, 1, "" );
-                foundSpace = uniformName.find( space );
+        std::transform( line.begin(), line.end(), line.begin(), ::tolower );
+        string uniform( "uniform " );
+        string semicolon( ";" );
+        string colon( ":" );
+        string space( " " );
+        string comment( "//" );
+        string comma( "," );
+        string newLine( "/n" );
+        
+        size_t foundUniform = line.find( uniform ); if( foundUniform == string::npos ) { continue; }
+        size_t foundComment = line.find( comment ); if( foundComment == string::npos || foundUniform > foundComment ) { continue; }
+        size_t foundType = string::npos;
+        size_t foundUIType = string::npos;
+        string type;
+        string uitype;
+        string key;
+        
+        bool valid = false;
+        for( auto& ui : uiTypeMap ) {
+            foundType = line.find( ui.first );
+            string tempkey = comment + ui.second + colon;
+            foundUIType = line.find( tempkey );
+            if( foundType != string::npos && foundUIType != string::npos ) {
+                valid = true;
+                type = ui.first;
+                uitype = ui.second;
+                key = tempkey;
+                break; 
             }
-            
-            if( mParams.find( uniformName ) == mParams.end() ) {
-                mParams[ uniformName ] = val;
-                mRanges[ uniformName ] = { min, max };
+        }
+        
+        if( !valid ) { continue; }
+        
+        string uniformName = original;
+        size_t foundSemicolon = uniformName.find( semicolon );
+        uniformName = uniformName.substr( 0, foundSemicolon );
+        uniformName = uniformName.replace( foundType, type.length(), "" );
+        uniformName = uniformName.replace( foundUniform, uniform.length(), "" );
+        uniformName = trim( uniformName, " " );
+        
+        string uiParams = line.substr( foundUIType + key.length() );
+        vector<string> params = split( uiParams, "," );
+        int size = params.size();
+        if( size < 1 ) { continue; }
+        
+        vector<float> values;
+        
+        bool invalidParams = false;
+        
+        for( auto &it : params ) {
+            try {
+                values.emplace_back( stof( it ) );
+            } catch( std::exception& exc ) {
+                invalidParams = true;
+                break;
             }
+        }
+
+        if( invalidParams ) { continue; }
+        
+        valid = false;
+        
+        if( type == "bool" && size == 1 ) {
+            bool val = values[ 0 ] > 0.5 ? true : false;
+            mBoolParams[ uniformName ] = val;
+            valid = true;
+        }
+        else if( type == "int" && size > 2 ) {
+            mIntParams[ uniformName ] = values[ 2 ];
+            mIntRanges[ uniformName ] = { values[ 0 ], values[  1 ] };
+            valid = true;
+        }
+        else if( type == "float" && size > 2 ) {
+            mFloatParams[ uniformName ] = values[ 2 ];
+            mFloatRanges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            valid = true;
+        }
+        else if( type == "vec2" && size > 2 ) {
+            if( uitype == "range" && size > 3 ) {
+                mVec2Params[ uniformName ] = vec2( values[ 2 ], values[ 3 ] );
+            }
+            else{
+                mVec2Params[ uniformName ] = vec2( values[ 2 ] );
+            }
+            mVec2Ranges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            valid = true;
+        }
+        else if( type == "vec3" && size > 2 ) {
+            mVec3Params[ uniformName ] = vec3( values[ 2 ] );
+            mVec3Ranges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            valid = true;
+        }
+        else if( type == "vec4" && size > 2 ) {
+            if( uitype == "color" && size > 3 ) {
+                ColorA clr;
+                clr.set( ColorModel::CM_RGB, vec4( values[ 0 ], values[ 1 ], values[ 2 ], values[ 3 ] ) );
+                mColorParams[ uniformName ] = clr;
+            }
+            else {
+                mVec4Params[ uniformName ] = vec4( values[ 2 ] );
+                mVec4Ranges[ uniformName ] = { values[ 0 ], values[ 1 ] };
+            }
+            valid = true;
+        }
+        
+        if( valid ) {
+            mTypeMap.insert( { uniformName, { type, uitype } } );
+            mParamOrder[ mParamOrder.size() ] = uniformName;
         }
     }
 }
 
-map<string, float>& GlslParams::getParams() {
-    return mParams;
-}
+const map<int, string>& GlslParams::getParamOrder() { return mParamOrder; }
 
-map<string, pair<float, float>>& GlslParams::getRanges() {
-    return mRanges;
-}
+const map<string, pair<string, string>>& GlslParams::getTypeMap() { return mTypeMap; }
+
+map<string, bool>& GlslParams::getBoolParams() { return mBoolParams; }
+
+map<string, int>& GlslParams::getIntParams() { return mIntParams; }
+map<string, pair<int, int>>& GlslParams::getIntRanges() { return mIntRanges; }
+
+map<string, float>& GlslParams::getFloatParams() { return mFloatParams; }
+map<string, pair<float, float>>& GlslParams::getFloatRanges() { return mFloatRanges; }
+
+map<string, vec2>& GlslParams::getVec2Params() { return mVec2Params; }
+map<string, pair<float, float>>& GlslParams::getVec2Ranges() { return mVec2Ranges; }
+
+map<string, vec3>& GlslParams::getVec3Params() { return mVec3Params; }
+map<string, pair<float, float>>& GlslParams::getVec3Ranges() { return mVec3Ranges; }
+
+map<string, vec4>& GlslParams::getVec4Params() { return mVec4Params; }
+map<string, pair<float, float>>& GlslParams::getVec4Ranges() { return mVec4Ranges; }
+
+map<string, ColorA>& GlslParams::getColorParams() { return mColorParams; }
