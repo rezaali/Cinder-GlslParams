@@ -17,6 +17,11 @@ class GlslParams {
 		return GlslParamsRef( new GlslParams( source ) );
 	}
 
+	static GlslParamsRef create()
+	{
+		return GlslParamsRef(new GlslParams());
+	}
+
 	GlslParams();
 	GlslParams( const std::string &source );
 	GlslParams( const GlslParams &copy );
