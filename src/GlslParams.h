@@ -41,7 +41,7 @@ class GlslParams {
 
 	static GlslParamsRef create()
 	{
-		return GlslParamsRef(new GlslParams());
+		return GlslParamsRef( new GlslParams() );
 	}
 
 	GlslParams();
