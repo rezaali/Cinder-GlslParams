@@ -244,7 +244,7 @@ void GlslParams::parse( const string &source )
 				params.clear();
 			}
 		}
-		int size = params.size();
+		int size = (int)params.size();
 
 		vector<float> values;
 		bool invalidParams = false;
@@ -349,7 +349,7 @@ void GlslParams::parse( const string &source )
 
 		if( valid ) {
 			mTypeMap.insert( { uniformName, { type, uitype } } );
-			mParamOrder[mParamOrder.size()] = uniformName;
+			mParamOrder[(int)mParamOrder.size()] = uniformName;
 		}
 	}
 }
